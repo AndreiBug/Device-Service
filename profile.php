@@ -222,7 +222,7 @@ if ($role === 'Client') {
                     <option value="device_employee" <?php if (isset($_POST['selectedTable']) && $_POST['selectedTable'] === 'device_employee')
                         echo 'selected'; ?>>Dispozitive - Angajat</option>
                     <!-- Interogări complexe -->
-                    <option value="client_services_payments" <?php if (isset($_POST['selectedTable']) && $_POST['selectedTable'] === 'client_services_payments')
+                    <option value="client_services_date" <?php if (isset($_POST['selectedTable']) && $_POST['selectedTable'] === 'client_services_date')
                         echo 'selected'; ?>>Servicii in Functie de
                         Data</option>
                     <option value="top_clients" <?php if (isset($_POST['selectedTable']) && $_POST['selectedTable'] === 'top_clients')
@@ -240,12 +240,14 @@ if ($role === 'Client') {
 
             if ($selectedTable === 'default') {
                 // Afișare tabel facturi (default)
-                echo "<thead><tr><th>ID Factură</th><th>Data Emiterii</th><th>Total (RON)</th><th>Status</th><th>Detalii</th></tr></thead>";
+                echo "<h3>Facturile Tale</h3><br>";
+                echo "<table border='1' cellspacing='0' cellpadding='10'>";
+                echo "<thead><tr><th>Data Emiterii</th><th>Total (RON)</th><th>Status</th><th>Detalii</th></tr></thead>";
                 echo "<tbody>";
+
                 if ($clientId && $result_invoices && $result_invoices->num_rows > 0) {
                     while ($row = $result_invoices->fetch_assoc()) {
                         echo "<tr>";
-                        echo "<td>" . htmlspecialchars($row['ID_Invoice']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Data_Emiterii']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Total']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Status']) . "</td>";
@@ -255,29 +257,27 @@ if ($role === 'Client') {
                         echo "</tr>";
 
                         // Detalii pentru plăți
-                        $sql_payments = "SELECT ID_Payment, Suma, Data_Platii, Metoda_Platii FROM payments WHERE ID_Invoice = ?";
+                        $sql_payments = "SELECT Suma, Data_Platii, Metoda_Platii FROM payments WHERE ID_Invoice = ?";
                         $stmt_payments = $conn->prepare($sql_payments);
                         $stmt_payments->bind_param("i", $row['ID_Invoice']);
                         $stmt_payments->execute();
                         $result_payments = $stmt_payments->get_result();
 
-                        echo "<h3>Facturile Tale</h3><br>";
-                        echo "<tr id='details-" . $row['ID_Invoice'] . "' class='details-row'>";
-                        echo "<td colspan='5'>";
+                        echo "<tr id='details-" . $row['ID_Invoice'] . "' class='details-row' style='display:none;'>";
+                        echo "<td colspan='4'>";
                         echo "<table border='1' width='100%'>";
-                        echo "<thead><tr><th>ID Plată</th><th>Suma</th><th>Data Plății</th><th>Metoda Plății</th></tr></thead>";
+                        echo "<thead><tr><th>Suma</th><th>Data Plății</th><th>Metoda Plății</th></tr></thead>";
                         echo "<tbody>";
                         if ($result_payments->num_rows > 0) {
                             while ($payment = $result_payments->fetch_assoc()) {
                                 echo "<tr>";
-                                echo "<td>" . htmlspecialchars($payment['ID_Payment']) . "</td>";
                                 echo "<td>" . htmlspecialchars($payment['Suma']) . "</td>";
                                 echo "<td>" . htmlspecialchars($payment['Data_Platii']) . "</td>";
                                 echo "<td>" . htmlspecialchars($payment['Metoda_Platii']) . "</td>";
                                 echo "</tr>";
                             }
                         } else {
-                            echo "<tr><td colspan='4'>Nu există plăți pentru această factură.</td></tr>";
+                            echo "<tr><td colspan='3'>Nu există plăți pentru această factură.</td></tr>";
                         }
                         echo "</tbody>";
                         echo "</table>";
@@ -285,9 +285,10 @@ if ($role === 'Client') {
                         echo "</tr>";
                     }
                 } else {
-                    echo "<tr><td colspan='5'>Nu există facturi disponibile.</td></tr>";
+                    echo "<tr><td colspan='4'>Nu există facturi disponibile.</td></tr>";
                 }
                 echo "</tbody>";
+                echo "</table>";
             } elseif ($selectedTable === 'device_services') {
                 // Afișare tabel 1
                 $sql_table1 = "
@@ -362,7 +363,7 @@ if ($role === 'Client') {
                     echo "<tr><td colspan='5'>Nu există date pentru tabelul 2.</td></tr>";
                 }
                 echo "</tbody>";
-            } elseif ($selectedTable === 'client_services_payments') {
+            } elseif ($selectedTable === 'client_services_date') {
                 $sql = "
         SELECT 
             d.Tip_Dispozitiv AS Tip_Dispozitiv,
@@ -396,7 +397,7 @@ if ($role === 'Client') {
                 <td>" . htmlspecialchars($row['Descriere_Serviciu']) . "</td>
                 <td>" . htmlspecialchars($row['Data_Inceperii']) . "</td>
                 <td>" . htmlspecialchars($row['Data_Finalizarii']) . "</td>
-              </tr>";
+            </tr>";
                 }
                 echo "</table>";
             } elseif ($selectedTable === 'top_clients') {
@@ -406,8 +407,8 @@ if ($role === 'Client') {
             c.Prenume AS Prenume_Client,
             COUNT(s.ID_Service) AS Numar_Reparatii,
             (SELECT GROUP_CONCAT(DISTINCT d.Tip_Dispozitiv SEPARATOR ', ')
-             FROM devices d
-             WHERE d.ID_Client = c.ID_Client) AS Tipuri_Dispozitive
+            FROM devices d
+            WHERE d.ID_Client = c.ID_Client) AS Tipuri_Dispozitive
         FROM clients c
         INNER JOIN devices d ON c.ID_Client = d.ID_Client
         INNER JOIN services s ON d.ID_Device = s.ID_Device
@@ -502,19 +503,24 @@ if ($role === 'Client') {
 
             // Afișarea formularului pentru modificare
             function showEditServiceForm(serviceId, deviceId, description, startDate, endDate, cost) {
+                // Setăm valorile ascunse pentru ID-uri
                 document.getElementById('editServiceId').value = serviceId;
-                document.getElementById('editDeviceId').value = deviceId;
+                document.getElementById('editDeviceIdHidden').value = deviceId;
+
+                // Setăm celelalte câmpuri editabile
                 document.getElementById('editDescription').value = description;
                 document.getElementById('editStartDate').value = startDate;
                 document.getElementById('editEndDate').value = endDate;
                 document.getElementById('editCost').value = cost;
 
+                // Afișăm formularul de editare
                 document.getElementById('editServiceForm').style.display = 'block';
             }
 
             function hideEditServiceForm() {
                 document.getElementById('editServiceForm').style.display = 'none';
             }
+
         </script>
     </head>
 
@@ -577,88 +583,85 @@ if ($role === 'Client') {
             if ($selectedTable === 'default') {
                 echo "<h3>Serviciile tale</h3><br>";
                 echo "<table border='1' cellspacing='0' cellpadding='10'>";
-                echo "<thead><tr><th>ID Serviciu</th><th>ID Dispozitiv</th><th>Descriere</th><th>Data Începerii</th><th>Data Finalizării</th><th>Cost</th><th>Acțiuni</th></tr></thead>";
+                echo "<thead><tr><th>Descriere</th><th>Data Începerii</th><th>Data Finalizării</th><th>Cost</th><th>Acțiuni</th></tr></thead>";
                 echo "<tbody>";
-
                 if ($result_services && $result_services->num_rows > 0) {
                     while ($row = $result_services->fetch_assoc()) {
                         echo "<tr>";
-                        echo "<td>" . htmlspecialchars($row['ID_Service']) . "</td>";
-                        echo "<td>" . htmlspecialchars($row['ID_Device']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Descriere']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Data_Inceperii']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Data_Finalizarii']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Cost']) . "</td>";
                         echo "<td>";
                         echo "<form method='post' style='display:inline;'>
-                <input type='hidden' name='delete_service' value='" . $row['ID_Service'] . "'>
-                <button type='submit' onclick=\"return confirm('Ești sigur că vrei să ștergi acest serviciu?')\">Delete</button><br><br>
-              </form>";
+            <input type='hidden' name='delete_service' value='" . $row['ID_Service'] . "'>
+            <button type='submit' onclick=\"return confirm('Ești sigur că vrei să ștergi acest serviciu?')\">Delete</button><br><br>
+        </form>";
                         echo "<button 
-                    onclick=\"showEditServiceForm('" . htmlspecialchars($row['ID_Service']) . "', '" . htmlspecialchars($row['ID_Device']) . "', '" . htmlspecialchars($row['Descriere']) . "', '" . htmlspecialchars($row['Data_Inceperii']) . "', '" . htmlspecialchars($row['Data_Finalizarii']) . "', '" . htmlspecialchars($row['Cost']) . "')\">
-                    Update
-                  </button>";
+            onclick=\"showEditServiceForm('" . htmlspecialchars($row['ID_Service']) . "', '" . htmlspecialchars($row['ID_Device']) . "', '" . htmlspecialchars($row['Descriere']) . "', '" . htmlspecialchars($row['Data_Inceperii']) . "', '" . htmlspecialchars($row['Data_Finalizarii']) . "', '" . htmlspecialchars($row['Cost']) . "')\">
+            Update
+          </button>";
                         echo "</td>";
                         echo "</tr>";
                     }
                 } else {
-                    echo "<tr><td colspan='7'>Nu există servicii disponibile.</td></tr>";
+                    echo "<tr><td colspan='5'>Nu există servicii disponibile.</td></tr>";
                 }
-
                 echo "</tbody>";
+
                 echo "</table>";
 
                 // Formular pentru modificare
                 echo "<div id='editServiceForm' style='display:none; margin-top:20px;'>
-            <h3>Modificare Serviciu</h3>
-            <form method='post'>
-                <input type='hidden' id='editServiceId' name='serviceId'>
+    <h3>Modificare Serviciu</h3>
+    <form method='post'>
+        <!-- ID-urile sunt trimise ca valori ascunse -->
+        <input type='hidden' id='editServiceId' name='serviceId'>
+        <input type='hidden' id='editDeviceIdHidden' name='deviceId'>
 
-                <label for='editDeviceId'>ID Dispozitiv:</label>
-                <input type='number' id='editDeviceId' name='deviceId' required><br>
+        <!-- Câmpuri editabile -->
+        <label for='editDescription'>Descriere:</label>
+        <input type='text' id='editDescription' name='description' required><br>
 
-                <label for='editDescription'>Descriere:</label>
-                <input type='text' id='editDescription' name='description' required><br>
+        <label for='editStartDate'>Data Începerii:</label>
+        <input type='date' id='editStartDate' name='startDate' required><br>
 
-                <label for='editStartDate'>Data Începerii:</label>
-                <input type='date' id='editStartDate' name='startDate' required><br>
+        <label for='editEndDate'>Data Finalizării:</label>
+        <input type='date' id='editEndDate' name='endDate'><br>
 
-                <label for='editEndDate'>Data Finalizării:</label>
-                <input type='date' id='editEndDate' name='endDate'><br>
+        <label for='editCost'>Cost:</label>
+        <input type='number' id='editCost' name='cost' step='0.01' required><br><br>
 
-                <label for='editCost'>Cost:</label>
-                <input type='number' id='editCost' name='cost' step='0.01' required><br><br>
+        <button type='submit' name='updateService'>Actualizează Serviciu</button><br><br>
+        <button type='button' onclick='hideEditServiceForm()'>Anulează</button><br><br>
+    </form>
+</div>";
 
-                <button type='submit' name='updateService'>Actualizează Serviciu</button><br><br>
-                <button type='button' onclick='hideEditServiceForm()'>Anulează</button><br><br>
-            </form>
-          </div>";
+
                 // Formular pentru adăugare
                 echo "<br><button id='addServiceButton' onclick='showAddServiceForm()'>Add new service</button><br>";
                 echo "<div id='addServiceForm' style='display:none;'>
-            <br><h3>Adaugă Serviciu</h3>
-            <form method='post'>
-                <label for='deviceId'>ID Dispozitiv:</label>
-                <input type='number' id='deviceId' name='deviceId' required><br>
-                <label for='description'>Descriere:</label>
-                <input type='text' id='description' name='description' required><br>
-                <label for='startDate'>Data Începerii:</label>
-                <input type='date' id='startDate' name='startDate' required><br>
-                <label for='endDate'>Data Finalizării:</label>
-                <input type='date' id='endDate' name='endDate'><br>
-                <label for='cost'>Cost:</label>
-                <input type='number' id='cost' name='cost' step='0.01' required><br>
-                <button type='submit' name='addService'>Adaugă Serviciu</button><br><br>
-                <button type='button' onclick='hideAddServiceForm()'>Anulează</button>
-            </form>
-                
-          </div>";
+        <br><h3>Adaugă Serviciu</h3>
+        <form method='post'>
+            <label for='deviceId'>ID Dispozitiv:</label>
+            <input type='number' id='deviceId' name='deviceId' required><br>
+            <label for='description'>Descriere:</label>
+            <input type='text' id='description' name='description' required><br>
+            <label for='startDate'>Data Începerii:</label>
+            <input type='date' id='startDate' name='startDate' required><br>
+            <label for='endDate'>Data Finalizării:</label>
+            <input type='date' id='endDate' name='endDate'><br>
+            <label for='cost'>Cost:</label>
+            <input type='number' id='cost' name='cost' step='0.01' required><br>
+            <button type='submit' name='addService'>Adaugă Serviciu</button><br><br>
+            <button type='button' onclick='hideAddServiceForm()'>Anulează</button>
+        </form>
+    </div>";
             } elseif ($selectedTable === 'employee_services') {
                 $sql = "
         SELECT 
             E.Nume AS Nume_Angajat, 
             E.Prenume AS Prenume_Angajat, 
-            S.ID_Service, 
             S.Descriere, 
             S.Data_Inceperii, 
             S.Data_Finalizarii
@@ -673,7 +676,7 @@ if ($role === 'Client') {
 
                 echo "<h3>Istoric Angajați-Servicii</h3><br>";
                 echo "<table border='1' cellspacing='0' cellpadding='10'>";
-                echo "<thead><tr><th>Nume Angajat</th><th>Prenume Angajat</th><th>ID Serviciu</th><th>Descriere</th><th>Data Începerii</th><th>Data Finalizării</th></tr></thead>";
+                echo "<thead><tr><th>Nume Angajat</th><th>Prenume Angajat</th><th>Descriere</th><th>Data Începerii</th><th>Data Finalizării</th></tr></thead>";
                 echo "<tbody>";
 
                 if ($result->num_rows > 0) {
@@ -681,7 +684,6 @@ if ($role === 'Client') {
                         echo "<tr>";
                         echo "<td>" . htmlspecialchars($row['Nume_Angajat']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Prenume_Angajat']) . "</td>";
-                        echo "<td>" . htmlspecialchars($row['ID_Service']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Descriere']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Data_Inceperii']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Data_Finalizarii']) . "</td>";
@@ -776,16 +778,18 @@ if ($role === 'Client') {
                 echo "</tbody>";
                 echo "</table>";
             } elseif ($selectedTable === 'clients_services') {
-                $sql = "
+                $sql = "      
         SELECT 
             C.Nume AS Nume_Client, 
             C.Prenume AS Prenume_Client, 
-            S.Descriere, 
-            S.Cost
+            S.Descriere AS Descriere_Serviciu, 
+            S.Cost AS Cost_Serviciu
         FROM Clients C
         JOIN Devices D ON C.ID_Client = D.ID_Client
         JOIN Services S ON D.ID_Device = S.ID_Device
-        WHERE D.ID_Device = ?";
+        JOIN Service_Employees SE ON S.ID_Service = SE.ID_Service
+        WHERE SE.ID_Employee = ?
+        ORDER BY C.Nume, C.Prenume, S.Descriere;";
                 $stmt = $conn->prepare($sql);
                 $stmt->bind_param("i", $employeeId);
                 $stmt->execute();
@@ -793,7 +797,7 @@ if ($role === 'Client') {
 
                 echo "<h3>Clienții și Serviciile</h3><br>";
                 echo "<table border='1' cellspacing='0' cellpadding='10'>";
-                echo "<thead><tr><th>Nume Client</th><th>Prenume Client</th><th>Descriere</th><th>Cost</th></tr></thead>";
+                echo "<thead><tr><th>Nume Client</th><th>Prenume Client</th><th>Descriere Serviciu</th><th>Cost Serviciu</th></tr></thead>";
                 echo "<tbody>";
 
                 if ($result->num_rows > 0) {
@@ -801,8 +805,8 @@ if ($role === 'Client') {
                         echo "<tr>";
                         echo "<td>" . htmlspecialchars($row['Nume_Client']) . "</td>";
                         echo "<td>" . htmlspecialchars($row['Prenume_Client']) . "</td>";
-                        echo "<td>" . htmlspecialchars($row['Descriere']) . "</td>";
-                        echo "<td>" . htmlspecialchars($row['Cost']) . "</td>";
+                        echo "<td>" . htmlspecialchars($row['Descriere_Serviciu']) . "</td>";
+                        echo "<td>" . htmlspecialchars($row['Cost_Serviciu']) . "</td>";
                         echo "</tr>";
                     }
                 } else {
@@ -822,7 +826,9 @@ if ($role === 'Client') {
         FROM Clients C
         JOIN Invoices I ON C.ID_Client = I.ID_Client
         JOIN Payments P ON I.ID_Invoice = P.ID_Invoice
-        WHERE C.ID_Client IN (SELECT DISTINCT ID_Client FROM Devices WHERE ID_Device IN (SELECT ID_Device FROM Service_Employees WHERE ID_Employee = ?))";
+        WHERE C.ID_Client IN (SELECT DISTINCT ID_Client 
+        FROM Devices WHERE ID_Device IN 
+        (SELECT ID_Device FROM Service_Employees WHERE ID_Employee = ?))";
                 $stmt = $conn->prepare($sql);
                 $stmt->bind_param("i", $employeeId);
                 $stmt->execute();
@@ -851,8 +857,8 @@ if ($role === 'Client') {
                 echo "</table>";
             } elseif ($selectedTable === 'employee_services_payments') {
                 $sql = "
+                
         SELECT 
-            s.ID_Service AS ID_Serviciu,
             s.Descriere AS Descriere_Serviciu,
             d.Tip_Dispozitiv AS Tip_Dispozitiv,
             d.Marca AS Marca,
@@ -878,12 +884,11 @@ if ($role === 'Client') {
 
                 // Începutul tabelului HTML
                 echo "<table border='1'>";
-                echo "<tr><th>ID Serviciu</th><th>Tip Dispozitiv</th><th>Marca</th><th>Model</th><th>Descriere Serviciu</th><th>Cost Serviciu</th><th>Data Început</th></tr>";
+                echo "<tr><th>Tip Dispozitiv</th><th>Marca</th><th>Model</th><th>Descriere Serviciu</th><th>Cost Serviciu</th><th>Data Început</th></tr>";
 
                 // Iterăm prin rezultatele query-ului
                 while ($row = $result->fetch_assoc()) {
                     echo "<tr>
-            <td>" . htmlspecialchars($row['ID_Serviciu']) . "</td>
             <td>" . htmlspecialchars($row['Tip_Dispozitiv']) . "</td>
             <td>" . htmlspecialchars($row['Marca']) . "</td>
             <td>" . htmlspecialchars($row['Model']) . "</td>
